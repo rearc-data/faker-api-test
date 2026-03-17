@@ -227,6 +227,105 @@ app.get('/api/events/wrapped', (req, res) => {
 // Health check
 app.get('/health', (req, res) => res.json({ status: 'ok' }));
 
+// Browser-friendly HTML dashboard
+app.get('/', (req, res) => {
+  const count = parseInt(req.query.count) || 10;
+  const safeCount = Math.min(count, 100);
+  const vulns = Array.from({ length: safeCount }, generateSnykVulnerability);
+
+  const severityColor = { critical: '#dc2626', high: '#ea580c', medium: '#d97706', low: '#16a34a' };
+
+  const rows = vulns.map(v => `
+    <tr>
+      <td><code style="font-size:11px">${v.id}</code></td>
+      <td>${v.title}</td>
+      <td>${v.moduleName}</td>
+      <td>${v.language}</td>
+      <td><span style="background:${severityColor[v.severity]};color:white;padding:2px 8px;border-radius:4px;font-size:12px">${v.severity}</span></td>
+      <td>${v.cvssScore}</td>
+      <td>${v.isPatchable ? '✅' : '❌'}</td>
+      <td>${v.isUpgradable ? '✅' : '❌'}</td>
+      <td style="font-size:11px">${new Date(v.creationTime).toLocaleDateString()}</td>
+    </tr>
+  `).join('');
+
+  res.send(`<!DOCTYPE html>
+<html>
+<head>
+  <title>Snyk Mock API</title>
+  <style>
+    body { font-family: sans-serif; margin: 0; background: #0f172a; color: #e2e8f0; }
+    header { background: #1e293b; padding: 20px 32px; border-bottom: 1px solid #334155; display: flex; align-items: center; gap: 16px; }
+    header img { height: 32px; }
+    header h1 { margin: 0; font-size: 20px; }
+    header p { margin: 0; font-size: 13px; color: #94a3b8; }
+    .controls { padding: 20px 32px; display: flex; gap: 12px; align-items: center; }
+    .controls input { background: #1e293b; border: 1px solid #334155; color: #e2e8f0; padding: 8px 12px; border-radius: 6px; width: 80px; }
+    .controls button { background: #3b82f6; color: white; border: none; padding: 8px 16px; border-radius: 6px; cursor: pointer; }
+    .controls a { color: #94a3b8; font-size: 13px; text-decoration: none; margin-left: 12px; }
+    .controls a:hover { color: #e2e8f0; }
+    .stats { padding: 0 32px 20px; display: flex; gap: 16px; }
+    .stat { background: #1e293b; border: 1px solid #334155; border-radius: 8px; padding: 12px 20px; }
+    .stat .num { font-size: 28px; font-weight: bold; }
+    .stat .label { font-size: 12px; color: #94a3b8; }
+    .critical .num { color: #dc2626; }
+    .high .num { color: #ea580c; }
+    .medium .num { color: #d97706; }
+    .low .num { color: #16a34a; }
+    table { width: calc(100% - 64px); margin: 0 32px 32px; border-collapse: collapse; font-size: 13px; }
+    th { background: #1e293b; padding: 10px 12px; text-align: left; border-bottom: 1px solid #334155; color: #94a3b8; font-weight: 500; }
+    td { padding: 10px 12px; border-bottom: 1px solid #1e293b; vertical-align: middle; }
+    tr:hover td { background: #1e293b; }
+  </style>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>🔍 Snyk Mock API</h1>
+      <p>Generating synthetic vulnerability data matching the Snyk JSONL dataset schema</p>
+    </div>
+  </header>
+
+  <div class="controls">
+    <form method="get" action="/" style="display:flex;gap:12px;align-items:center">
+      <label style="font-size:13px;color:#94a3b8">Count:</label>
+      <input type="number" name="count" value="${safeCount}" min="1" max="100" />
+      <button type="submit">Refresh</button>
+    </form>
+    <a href="/api/events?count=${safeCount}" target="_blank">📄 NDJSON endpoint</a>
+    <a href="/api/events/wrapped?count=${safeCount}" target="_blank">📦 Wrapped JSON</a>
+    <a href="/health" target="_blank">❤️ Health</a>
+  </div>
+
+  <div class="stats">
+    <div class="stat critical"><div class="num">${vulns.filter(v => v.severity === 'critical').length}</div><div class="label">Critical</div></div>
+    <div class="stat high"><div class="num">${vulns.filter(v => v.severity === 'high').length}</div><div class="label">High</div></div>
+    <div class="stat medium"><div class="num">${vulns.filter(v => v.severity === 'medium').length}</div><div class="label">Medium</div></div>
+    <div class="stat low"><div class="num">${vulns.filter(v => v.severity === 'low').length}</div><div class="label">Low</div></div>
+    <div class="stat"><div class="num">${vulns.filter(v => v.isPatchable).length}</div><div class="label">Patchable</div></div>
+    <div class="stat"><div class="num">${safeCount}</div><div class="label">Total Shown</div></div>
+  </div>
+
+  <table>
+    <thead>
+      <tr>
+        <th>ID</th>
+        <th>Title</th>
+        <th>Module</th>
+        <th>Language</th>
+        <th>Severity</th>
+        <th>CVSS</th>
+        <th>Patchable</th>
+        <th>Upgradable</th>
+        <th>Created</th>
+      </tr>
+    </thead>
+    <tbody>${rows}</tbody>
+  </table>
+</body>
+</html>`);
+});
+
 app.listen(port, () => {
   console.log(`Snyk Mock API running on port ${port}`);
   console.log(`  GET /api/events?count=100       → JSONL (one vulnerability per line)`);
