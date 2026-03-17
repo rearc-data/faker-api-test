@@ -85,9 +85,8 @@ function generateSnykVulnerability() {
     // ── Project / org context ──────────────────────────────────────────────
     projectName,
     org,
-    path: `/Users/${faker.internet.username()}/Work/${projectName}`,
+    path: `/Users/${faker.internet.userName()}/Work/${projectName}`,
     displayTargetFile: "package-lock.json",
-    packageManager_parent: packageManager,
 
     // ── Remediation flags ──────────────────────────────────────────────────
     isPatchable,
