@@ -1,5 +1,7 @@
 import express from 'express';
 import { faker } from '@faker-js/faker';
+import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { gzipSync } from 'zlib';
 
 const app = express();
 
@@ -284,6 +286,26 @@ app.get('/', (req, res) => {
   </table>
 </body>
 </html>`);
+});
+
+// Generate and write JSONL.gz directly to Volume
+app.get('/api/generate', (req, res) => {
+  const count = Math.min(parseInt(req.query.count) || 100, 5000);
+  const vulns = Array.from({ length: count }, generateSnykVulnerability);
+  
+  const jsonl = vulns.map(v => JSON.stringify(v)).join('\n');
+  const compressed = gzipSync(Buffer.from(jsonl, 'utf-8'));
+  
+  const ts = new Date().toISOString().replace(/[-:]/g, '').split('.')[0];
+  const filename = `snyk_vulns_${ts}.jsonl.gz`;
+  const filepath = `/Volumes/dsl_dev/internal/faker_snyk_output/${filename}`;
+  
+  try {
+    writeFileSync(filepath, compressed);
+    res.json({ status: 'ok', file: filepath, records: count, bytes: compressed.length });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
 });
 
 app.listen(port, () => {
