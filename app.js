@@ -291,8 +291,8 @@ app.get('/', (req, res) => {
 </html>`);
 });
 
-// Generate and write JSONL.gz directly to Volume
-app.get('/api/generate', (req, res) => {
+// Generate and write JSONL.gz to Volume via Databricks API
+app.get('/api/generate', async (req, res) => {
   const count = Math.min(parseInt(req.query.count) || 100, 5000);
   const vulns = Array.from({ length: count }, generateSnykVulnerability);
   
@@ -301,11 +301,39 @@ app.get('/api/generate', (req, res) => {
   
   const ts = new Date().toISOString().replace(/[-:]/g, '').split('.')[0];
   const filename = `snyk_vulns_${ts}.jsonl.gz`;
-  const filepath = `/Volumes/dsl_dev/internal/faker_snyk_output/${filename}`;
+  const volumePath = `/Volumes/dsl_dev/internal/faker_snyk_output/${filename}`;
   
   try {
-    writeFileSync(filepath, compressed);
-    res.json({ status: 'ok', file: filepath, records: count, bytes: compressed.length });
+    // Use Databricks Files API to upload to Volume
+    const host = process.env.DATABRICKS_HOST;
+    const clientId = process.env.DATABRICKS_CLIENT_ID;
+    const clientSecret = process.env.DATABRICKS_CLIENT_SECRET;
+    
+    // Get OAuth token using client credentials
+    const tokenRes = await fetch(`https://${host}/oidc/v1/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}&scope=all-apis`
+    });
+    const tokenData = await tokenRes.json();
+    const accessToken = tokenData.access_token;
+    
+    // Upload file via Files API
+    const uploadRes = await fetch(`https://${host}/api/2.0/fs/files${volumePath}`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${accessToken}`,
+        'Content-Type': 'application/octet-stream'
+      },
+      body: compressed
+    });
+    
+    if (!uploadRes.ok) {
+      const err = await uploadRes.text();
+      throw new Error(`Upload failed (${uploadRes.status}): ${err}`);
+    }
+    
+    res.json({ status: 'ok', file: volumePath, records: count, bytes: compressed.length });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }
