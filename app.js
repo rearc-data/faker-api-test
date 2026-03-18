@@ -1,6 +1,6 @@
 import express from 'express';
 import { faker } from '@faker-js/faker';
-import { writeFileSync, mkdirSync, existsSync } from 'fs';
+import { writeFileSync, mkdirSync, existsSync, readdirSync } from 'fs';
 import { gzipSync } from 'zlib';
 
 const app = express();
@@ -312,20 +312,15 @@ app.get('/api/generate', (req, res) => {
 });
 
 app.get('/api/debug', (req, res) => {
-  const fs = await import('fs');
   const env = Object.entries(process.env)
     .filter(([k]) => k.includes('VOLUME') || k.includes('DATABRICKS') || k.includes('volume'))
     .reduce((acc, [k, v]) => ({ ...acc, [k]: v }), {});
   
   let volumeExists = false;
-  try {
-    volumeExists = fs.existsSync('/Volumes/dsl_dev/internal/faker_snyk_output');
-  } catch(e) {}
+  try { volumeExists = existsSync('/Volumes/dsl_dev/internal/faker_snyk_output'); } catch(e) {}
   
   let rootVolumes = [];
-  try {
-    rootVolumes = fs.readdirSync('/Volumes');
-  } catch(e) { rootVolumes = [e.message]; }
+  try { rootVolumes = readdirSync('/Volumes'); } catch(e) { rootVolumes = [e.message]; }
   
   res.json({ env, volumeExists, rootVolumes });
 });
