@@ -353,6 +353,47 @@ app.get('/api/debug', (req, res) => {
   res.json({ env, volumeExists, rootVolumes });
 });
 
+// Auto-generate data on startup if AUTO_GENERATE env var is set
+const autoCount = parseInt(process.env.AUTO_GENERATE_COUNT || '0');
+if (autoCount > 0) {
+  (async () => {
+    try {
+      const vulns = Array.from({ length: autoCount }, generateSnykVulnerability);
+      const jsonl = vulns.map(v => JSON.stringify(v)).join('\n');
+      const compressed = gzipSync(Buffer.from(jsonl, 'utf-8'));
+      
+      const ts = new Date().toISOString().replace(/[-:]/g, '').split('.')[0];
+      const filename = `snyk_vulns_${ts}.jsonl.gz`;
+      const volumePath = `/Volumes/dsl_dev/internal/faker_snyk_output/${filename}`;
+      
+      const host = process.env.DATABRICKS_HOST;
+      const clientId = process.env.DATABRICKS_CLIENT_ID;
+      const clientSecret = process.env.DATABRICKS_CLIENT_SECRET;
+      
+      const tokenRes = await fetch(`https://${host}/oidc/v1/token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: `grant_type=client_credentials&client_id=${clientId}&client_secret=${clientSecret}&scope=all-apis`
+      });
+      const { access_token } = await tokenRes.json();
+      
+      const uploadRes = await fetch(`https://${host}/api/2.0/fs/files${volumePath}`, {
+        method: 'PUT',
+        headers: { 'Authorization': `Bearer ${access_token}`, 'Content-Type': 'application/octet-stream' },
+        body: compressed
+      });
+      
+      if (uploadRes.ok) {
+        console.log(`Auto-generated ${autoCount} records → ${volumePath}`);
+      } else {
+        console.error(`Auto-generate failed: ${await uploadRes.text()}`);
+      }
+    } catch (err) {
+      console.error(`Auto-generate error: ${err.message}`);
+    }
+  })();
+}
+
 app.listen(port, () => {
   console.log(`Snyk Mock API running on port ${port}`);
   console.log(`  GET /                            → HTML dashboard (preview)`);
