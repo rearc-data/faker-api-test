@@ -5,6 +5,9 @@ import { gzipSync } from 'zlib';
 
 const app = express();
 
+// The volume path is available via environment variable based on resource key
+const VOLUME_PATH = process.env.VOLUME_PATH || '/Volumes/dsl_dev/internal/faker_snyk_output';
+
 // Bypass Databricks SSO auth for internal notebook access
 app.use((req, res, next) => {
   if (req.query.key === 'snyk-faker-2026') return next();
@@ -306,6 +309,25 @@ app.get('/api/generate', (req, res) => {
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }
+});
+
+app.get('/api/debug', (req, res) => {
+  const fs = await import('fs');
+  const env = Object.entries(process.env)
+    .filter(([k]) => k.includes('VOLUME') || k.includes('DATABRICKS') || k.includes('volume'))
+    .reduce((acc, [k, v]) => ({ ...acc, [k]: v }), {});
+  
+  let volumeExists = false;
+  try {
+    volumeExists = fs.existsSync('/Volumes/dsl_dev/internal/faker_snyk_output');
+  } catch(e) {}
+  
+  let rootVolumes = [];
+  try {
+    rootVolumes = fs.readdirSync('/Volumes');
+  } catch(e) { rootVolumes = [e.message]; }
+  
+  res.json({ env, volumeExists, rootVolumes });
 });
 
 app.listen(port, () => {
