@@ -3,8 +3,7 @@ import { faker } from '@faker-js/faker';
 import { writeFileSync, mkdirSync, existsSync, readdirSync } from 'fs';
 import { gzipSync } from 'zlib';
 
-RECORD_COUNT = 100
-
+const RECORD_COUNT = 100
 const app = express();
 
 // The volume path is available via environment variable based on resource key
