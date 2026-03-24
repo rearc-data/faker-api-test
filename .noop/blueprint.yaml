@@ -1,0 +1,21 @@
+components:
+  - name: FakerApi
+    type: service
+    image: node:18-alpine
+    port: 8000
+    build:
+      steps:
+        - copy: package*.json
+          destination: ./
+        - run: npm install
+        - copy: app.js
+          destination: ./
+    runtime:
+      command: node app.js
+
+routes:
+  - target:
+      component: FakerApi
+    pattern: /**
+
+    
