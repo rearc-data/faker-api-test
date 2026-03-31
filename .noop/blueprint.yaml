@@ -8,9 +8,7 @@ components:
     runtime:
       command: node app.js
       variables:
-        APP_TOKEN:
-          value: 5812529e2361ee108325c49270608329839e5f5ec91bdc4371d1e6f5a5d06b38
-          secret: true
+        APP_TOKEN: 5812529e2361ee108325c49270608329839e5f5ec91bdc4371d1e6f5a5d06b38
     type: service
     port: 8000
     build:
